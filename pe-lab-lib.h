@@ -2,58 +2,60 @@
 #include <time.h>
 #include <iomanip>
 #include <map>
+#include <cstdint>
+#include <fstream>
 
 using namespace std;
 
 struct ImageDataDirectoryEntry {
-    int VA;
-    int size;
+    uint32_t VA;
+    uint32_t size;
 };
 
 struct COFFHeader{
-    short machine;
-    short numOfSections;
-    int timeDateStamp;
-    int pToSymbolTable;
-    int numOfSymbols;
-    short sizeOfOptionalHeader;
-    short characteristics;
+    uint16_t machine;
+    uint16_t numOfSections;
+    uint32_t timeDateStamp;
+    uint32_t pToSymbolTable;
+    uint32_t numOfSymbols;
+    uint16_t sizeOfOptionalHeader;
+    uint16_t characteristics;
 };
 
 struct PE32StandardHeader {
-    short magic;
-    char majorLinkerVersion;
-    char minorLinkerVersion;
-    int sizeOfCode;
-    int sizeOfInitializedData;
-    int sizeOfUnitializedData;
-    int addressOfEntryPoint;
-    int baseOfCode;
-    int baseOfData;
+    uint16_t magic;
+    uint8_t majorLinkerVersion;
+    uint8_t minorLinkerVersion;
+    uint32_t sizeOfCode;
+    uint32_t sizeOfInitializedData;
+    uint32_t sizeOfUnitializedData;
+    uint32_t addressOfEntryPoint;
+    uint32_t baseOfCode;
+    uint32_t baseOfData;
 };
 
 struct PE32WindowsHeader {
-    int imageBase;
-    int sectionAlignment;
-    int fileAlignment;
-    short majorOSVersion;
-    short minorOSVersion;
-    short majorImageVersion;
-    short minorImageVersion;
-    short majorSubsysVersion;
-    short minotSubsysVersion;
-    int win32VersionValue;
-    int sizeOfImage;
-    int sizeOfHeaders;
-    int checkSum;
-    short subsystem;
-    short dllCharacteristics;
-    int sizeOfStackReserve;
-    int sizeOfStackCommit;
-    int sizeOfHeapReserve;
-    int sizeOfHeapCommit;
-    int loaderFlags;
-    int numOfRvaAndSizes;
+    uint32_t imageBase;
+    uint32_t sectionAlignment;
+    uint32_t fileAlignment;
+    uint16_t majorOSVersion;
+    uint16_t minorOSVersion;
+    uint16_t majorImageVersion;
+    uint16_t minorImageVersion;
+    uint16_t majorSubsysVersion;
+    uint16_t minotSubsysVersion;
+    uint32_t win32VersionValue;
+    uint32_t sizeOfImage;
+    uint32_t sizeOfHeaders;
+    uint32_t checkSum;
+    uint16_t subsystem;
+    uint16_t dllCharacteristics;
+    uint32_t sizeOfStackReserve;
+    uint32_t sizeOfStackCommit;
+    uint32_t sizeOfHeapReserve;
+    uint32_t sizeOfHeapCommit;
+    uint32_t loaderFlags;
+    uint32_t numOfRvaAndSizes;
 };
 
 struct PE32OptionalHeader {
@@ -62,38 +64,38 @@ struct PE32OptionalHeader {
 };
 
 struct PE32PlusStandardHeader {
-    short magic;
-    char majorLinkerVersion;
-    char minorLinkerVersion;
-    int sizeOfCode;
-    int sizeOfInitializedData;
-    int sizeOfUnitializedData;
-    int addressOfEntryPoint;
-    int baseOfCode;
+    uint16_t magic;
+    uint8_t majorLinkerVersion;
+    uint8_t minorLinkerVersion;
+    uint32_t sizeOfCode;
+    uint32_t sizeOfInitializedData;
+    uint32_t sizeOfUnitializedData;
+    uint32_t addressOfEntryPoint;
+    uint32_t baseOfCode;
 };
 
 struct PE32PlusWindowsHeader {
-    long imageBase;
-    int sectionAlignment;
-    int fileAlignment;
-    short majorOSVersion;
-    short minorOSVersion;
-    short majorImageVersion;
-    short minorImageVersion;
-    short majorSubsysVersion;
-    short minotSubsysVersion;
-    int win32VersionValue;
-    int sizeOfImage;
-    int sizeOfHeaders;
-    int checkSum;
-    short subsystem;
-    short dllCharacteristics;
-    long sizeOfStackReserve;
-    long sizeOfStackCommit;
-    long sizeOfHeapReserve;
-    long sizeOfHeapCommit;
-    int loaderFlags;
-    int numOfRvaAndSizes;
+    uint64_t imageBase;
+    uint32_t sectionAlignment;
+    uint32_t fileAlignment;
+    uint16_t majorOSVersion;
+    uint16_t minorOSVersion;
+    uint16_t majorImageVersion;
+    uint16_t minorImageVersion;
+    uint16_t majorSubsysVersion;
+    uint16_t minotSubsysVersion;
+    uint32_t win32VersionValue;
+    uint32_t sizeOfImage;
+    uint32_t sizeOfHeaders;
+    uint32_t checkSum;
+    uint16_t subsystem;
+    uint16_t dllCharacteristics;
+    uint64_t sizeOfStackReserve;
+    uint64_t sizeOfStackCommit;
+    uint64_t sizeOfHeapReserve;
+    uint64_t sizeOfHeapCommit;
+    uint32_t loaderFlags;
+    uint32_t numOfRvaAndSizes;
 };
 
 struct PE32PlusOptionalHeader {
@@ -102,19 +104,35 @@ struct PE32PlusOptionalHeader {
 };
 
 struct SectionTableEntry {
-    char name[8];
-    int virtualSize;
-    int virtualAddress;
-    int sizeOfRawData;
-    int pToRawData;
-    int pToRelocations;
-    int pToLinenumbers;
-    short numOfRelocations;
-    short numOfLinenumbers;
-    int characteristics;
+    uint8_t name[8];
+    uint32_t virtualSize;
+    uint32_t virtualAddress;
+    uint32_t sizeOfRawData;
+    uint32_t pToRawData;
+    uint32_t pToRelocations;
+    uint32_t pToLinenumbers;
+    uint16_t numOfRelocations;
+    uint16_t numOfLinenumbers;
+    uint32_t characteristics;
 };
 
-map<unsigned short, const char *> machineType = {
+struct ImportDirectoryTableEntry {
+    uint32_t ILT_RVA;
+    uint32_t timestamp;
+    uint32_t forwarderChain;
+    uint32_t nameRVA;
+    uint32_t IAT_RVA;
+};
+
+struct ILTEntryPE32 {
+    uint32_t bitField; // 0-30 (Name Table RVA) 0-15 (Ordinal number) 31/63 0 or 1 depending on import type
+};
+
+struct ILTEntryPE32Plus {
+
+};
+
+map<uint16_t, const char *> machineType = {
     {0x0, "Machine Unknown"},
     {0x1d3, "Matsushita AM33"},
     {0x8664, "x64"},
@@ -144,7 +162,7 @@ map<unsigned short, const char *> machineType = {
     {0x169, "MIPS little-endian WCE v2"}
 };
 
-map<unsigned short, const char *> subsystem = {
+map<uint16_t, const char *> subsystem = {
     {0, "Unknown"},
     {1, "Native"},
     {2, "GUI"},
@@ -161,12 +179,12 @@ map<unsigned short, const char *> subsystem = {
     {16, "Windows Boot Application"}
 };
 
-char * getTime(int timestamp) {
+char* getTime(uint32_t timestamp) {
     time_t a = timestamp;
     return ctime(&a);
 }
 
-string getChars(short chars) {
+string getChars(uint16_t chars) {
     string ret = "";
     if (chars & 0x0020) {
         ret += "PE32+, ";
@@ -189,7 +207,7 @@ string getChars(short chars) {
     return ret;
 }
 
-string getDLLChars(short chars) {
+string getDLLChars(uint16_t chars) {
     string ret = "";
     if (chars & 0x0100) {
         ret += "NX compatible, ";
@@ -208,109 +226,148 @@ string getDLLChars(short chars) {
 
 /*
 struct COFFHeader{
-    short machine;
-    short numOfSections;
-    int timeDateStamp;
-    int pToSymbolTable;
-    int numOfSymbols;
-    short sizeOfOptionalHeader;
-    short characteristics;
+    uint16_t machine;
+    uint16_t numOfSections;
+    uint32_t timeDateStamp;
+    uint32_t pToSymbolTable;
+    uint32_t numOfSymbols;
+    uint16_t sizeOfOptionalHeader;
+    uint16_t characteristics;
 };
 
 */
 
-void printCOFFHeaderInfo(COFFHeader header) {
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    cout << " |##########                   COFF Header Info                    ##########|" << endl;
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    cout << "  [*] Machine: " << machineType[header.machine] << endl;
-    cout << "  [*] Sections #: " << header.numOfSections << endl;
-    cout << "  [*] Time created: " << getTime(header.timeDateStamp);
-    printf("  [*] Symbol table addr: 0x%x\n", header.pToSymbolTable);
-    cout << "  [*] Symbols #: " << header.numOfSymbols << endl;
-    cout << "  [*] Size of optional header: " << header.sizeOfOptionalHeader << endl;
-    cout << "  [*] Characteristics: " << getChars(header.characteristics) << endl << endl;
+bool namecmp(uint8_t *name, const char *sectionName) {
+    int i = 0;
+    while (name[i] != 0 && i < 8) {
+        if (name[i] != sectionName[i]) return false;
+        i++;
+    }
+    return true;
 }
 
-void printOptionalHeader(PE32OptionalHeader header) {
+string readAscii(ifstream &infile, int offset) {
+    char c = 1;
+    string ret;
+    int i = 0;
+    while (c != 0) {
+        infile.seekg(offset + i, ios::beg);
+        infile.read(&c, 1);
+        ret += c;
+        i++;
+    }
+    return ret;
+}
+
+void printCOFFHeaderInfo(COFFHeader *header) {
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########                   COFF Header Info                    ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << "  [*] Machine: " << machineType[header->machine] << endl;
+    std::cout << "  [*] Sections #: " << header->numOfSections << endl;
+    std::cout << "  [*] Time created: " << getTime(header->timeDateStamp);
+    printf("  [*] Symbol table addr: 0x%x\n", header->pToSymbolTable);
+    std::cout << "  [*] Symbols #: " << header->numOfSymbols << endl;
+    std::cout << "  [*] Size of optional header: " << header->sizeOfOptionalHeader << endl;
+    std::cout << "  [*] Characteristics: " << getChars(header->characteristics) << endl << endl;
+}
+
+void printOptionalHeader(PE32OptionalHeader *header) {
     // Standard Header
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    cout << " |##########                  Optional Header Info                 ##########|" << endl;
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    printf("  [*] Magic: 0x%x (PE32)\n", header.standardHead.magic);
-    cout << "  [*] Major Linker Version: " << header.standardHead.majorLinkerVersion << endl;
-    cout << "  [*] Minor Linker Version: " << header.standardHead.minorLinkerVersion << endl;
-    cout << "  [*] Size of code: " << header.standardHead.sizeOfCode << endl;
-    cout << "  [*] Size of init. data: " << header.standardHead.sizeOfInitializedData << endl;
-    cout << "  [*] Size of uninit. data: " << header.standardHead.sizeOfUnitializedData << endl;
-    printf("  [*] Addr of entry: 0x%x\n", header.standardHead.addressOfEntryPoint);
-    printf("  [*] Base of code: 0x%x\n", header.standardHead.baseOfCode);
-    printf("  [*] Base of data: 0x%x\n", header.standardHead.baseOfData); // Unqiue to PE32
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########                  Optional Header Info                 ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    printf("  [*] Magic: 0x%x (PE32)\n", header->standardHead.magic);
+    std::cout << "  [*] Major Linker Version: " << header->standardHead.majorLinkerVersion << endl;
+    std::cout << "  [*] Minor Linker Version: " << header->standardHead.minorLinkerVersion << endl;
+    std::cout << "  [*] Size of code: " << header->standardHead.sizeOfCode << endl;
+    std::cout << "  [*] Size of init. data: " << header->standardHead.sizeOfInitializedData << endl;
+    std::cout << "  [*] Size of uninit. data: " << header->standardHead.sizeOfUnitializedData << endl;
+    printf("  [*] Addr of entry: 0x%x\n", header->standardHead.addressOfEntryPoint);
+    printf("  [*] Base of code: 0x%x\n", header->standardHead.baseOfCode);
+    printf("  [*] Base of data: 0x%x\n", header->standardHead.baseOfData); // Unqiue to PE32
 
     // Windows Header
-    printf("  [*] Image Base: 0x%x (PE32)\n", header.winHead.imageBase);
-    cout << "  [*] Section Alignment: " << header.winHead.sectionAlignment << endl;
-    cout << "  [*] File Alignment: " << header.winHead.fileAlignment << endl;
-    cout << "  [*] Major OS Version: " << header.winHead.majorOSVersion << endl;
-    cout << "  [*] Minor OS Version: " << header.winHead.minorOSVersion << endl;
-    cout << "  [*] Major Subsys. Version: " << header.winHead.majorSubsysVersion << endl;
-    cout << "  [*] Minor Subsys. Version: " << header.winHead.minotSubsysVersion << endl;
-    cout << "  [*] Win32 Version Value: " << header.winHead.win32VersionValue << endl;
-    cout << "  [*] Size of Headers: " << header.winHead.sizeOfHeaders << endl;
-    cout << "  [*] Checksum: " << header.winHead.checkSum << endl;
-    cout << "  [*] Subsystem: " << subsystem[header.winHead.subsystem] << endl;
-    cout << "  [*] Size of Headers: " << header.winHead.sizeOfHeaders << endl;
-    cout << "  [*] Dll Characteristics: " << getDLLChars(header.winHead.dllCharacteristics) << endl;
-    cout << "  [*] Size of Stack Reserve: " << header.winHead.sizeOfStackReserve << endl;
-    cout << "  [*] Size of Stack Commit: " << header.winHead.sizeOfStackCommit << endl;
-    cout << "  [*] Size of Heap Reserve: " << header.winHead.sizeOfHeapReserve << endl;
-    cout << "  [*] Size of Heap Commit: " << header.winHead.sizeOfHeapCommit << endl;
-    cout << "  [*] Loader Flags: " << header.winHead.loaderFlags << endl;
-    cout << "  [*] Number of Rva and Sizes: " << header.winHead.numOfRvaAndSizes<< endl;
+    printf("  [*] Image Base: 0x%x (PE32)\n", header->winHead.imageBase);
+    std::cout << "  [*] Section Alignment: " << header->winHead.sectionAlignment << endl;
+    std::cout << "  [*] File Alignment: " << header->winHead.fileAlignment << endl;
+    std::cout << "  [*] Major OS Version: " << header->winHead.majorOSVersion << endl;
+    std::cout << "  [*] Minor OS Version: " << header->winHead.minorOSVersion << endl;
+    std::cout << "  [*] Major Subsys. Version: " << header->winHead.majorSubsysVersion << endl;
+    std::cout << "  [*] Minor Subsys. Version: " << header->winHead.minotSubsysVersion << endl;
+    std::cout << "  [*] Win32 Version Value: " << header->winHead.win32VersionValue << endl;
+    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << endl;
+    std::cout << "  [*] Checksum: " << header->winHead.checkSum << endl;
+    std::cout << "  [*] Subsystem: " << subsystem[header->winHead.subsystem] << endl;
+    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << endl;
+    std::cout << "  [*] Dll Characteristics: " << getDLLChars(header->winHead.dllCharacteristics) << endl;
+    std::cout << "  [*] Size of Stack Reserve: " << header->winHead.sizeOfStackReserve << endl;
+    std::cout << "  [*] Size of Stack Commit: " << header->winHead.sizeOfStackCommit << endl;
+    std::cout << "  [*] Size of Heap Reserve: " << header->winHead.sizeOfHeapReserve << endl;
+    std::cout << "  [*] Size of Heap Commit: " << header->winHead.sizeOfHeapCommit << endl;
+    std::cout << "  [*] Loader Flags: " << header->winHead.loaderFlags << endl;
+    std::cout << "  [*] Number of Rva and Sizes: " << header->winHead.numOfRvaAndSizes<< endl;
 }
 
-void printOptionalHeader(PE32PlusOptionalHeader header) {
+string getSectionEntryChars(SectionTableEntry *entry) {
+    string ret = "";
+    ret += entry->characteristics & 0x40000000 ? "r" : "-"; // check readable
+    ret += entry->characteristics & 0x80000000 ? "w" : "-"; // check writable
+    ret += entry->characteristics & 0x20000000 ? "x" : "-"; // check executable
+    return ret;
+}
+
+void printSectionTableInfo(SectionTableEntry *entries, uint32_t len) {
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########                   Section Table Info                  ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    for (uint32_t i = 0; i < len; i++) {
+        std::cout << "  [*] Name: " << setw(6) << entries[i].name << setfill(' ') << setw(5) << getSectionEntryChars(&entries[i]) << endl;
+    }
+}
+
+void printOptionalHeader(PE32PlusOptionalHeader *header) {
     // Standard Header
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    cout << " |##########                  Optional Header Info                 ##########|" << endl;
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    printf("  [*] Magic: 0x%x (PE32+)\n", header.standardHead.magic);
-    cout << "  [*] Major Linker Version: " << header.standardHead.majorLinkerVersion << endl;
-    cout << "  [*] Minor Linker Version: " << header.standardHead.minorLinkerVersion << endl;
-    cout << "  [*] Size of code: " << header.standardHead.sizeOfCode << endl;
-    cout << "  [*] Size of init. data: " << header.standardHead.sizeOfInitializedData << endl;
-    cout << "  [*] Size of uninit. data: " << header.standardHead.sizeOfUnitializedData << endl;
-    printf("  [*] Addr of entry: 0x%x\n", header.standardHead.addressOfEntryPoint);
-    printf("  [*] Base of code: 0x%x\n", header.standardHead.baseOfCode);
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########                  Optional Header Info                 ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    printf("  [*] Magic: 0x%x (PE32+)\n", header->standardHead.magic);
+    std::cout << "  [*] Major Linker Version: " << header->standardHead.majorLinkerVersion << endl;
+    std::cout << "  [*] Minor Linker Version: " << header->standardHead.minorLinkerVersion << endl;
+    std::cout << "  [*] Size of code: " << header->standardHead.sizeOfCode << endl;
+    std::cout << "  [*] Size of init. data: " << header->standardHead.sizeOfInitializedData << endl;
+    std::cout << "  [*] Size of uninit. data: " << header->standardHead.sizeOfUnitializedData << endl;
+    printf("  [*] Addr of entry: 0x%x\n", header->standardHead.addressOfEntryPoint);
+    printf("  [*] Base of code: 0x%x\n", header->standardHead.baseOfCode);
 
     // Windows Header
-    printf("  [*] Image Base: 0x%lx (PE32+)\n", header.winHead.imageBase);
-    cout << "  [*] Section Alignment: " << header.winHead.sectionAlignment << endl;
-    cout << "  [*] File Alignment: " << header.winHead.fileAlignment << endl;
-    cout << "  [*] Major OS Version: " << header.winHead.majorOSVersion << endl;
-    cout << "  [*] Minor OS Version: " << header.winHead.minorOSVersion << endl;
-    cout << "  [*] Major Subsys. Version: " << header.winHead.majorSubsysVersion << endl;
-    cout << "  [*] Minor Subsys. Version: " << header.winHead.minotSubsysVersion << endl;
-    cout << "  [*] Win32 Version Value: " << header.winHead.win32VersionValue << endl;
-    cout << "  [*] Size of Headers: " << header.winHead.sizeOfHeaders << endl;
-    cout << "  [*] Checksum: " << header.winHead.checkSum << endl;
-    cout << "  [*] Subsystem: " << subsystem[header.winHead.subsystem] << endl;
-    cout << "  [*] Size of Headers: " << header.winHead.sizeOfHeaders << endl;
-    cout << "  [*] Dll Characteristics: " << getDLLChars(header.winHead.dllCharacteristics) << endl;
-    cout << "  [*] Size of Stack Reserve: " << header.winHead.sizeOfStackReserve << endl;
-    cout << "  [*] Size of Stack Commit: " << header.winHead.sizeOfStackCommit << endl;
-    cout << "  [*] Size of Heap Reserve: " << header.winHead.sizeOfHeapReserve << endl;
-    cout << "  [*] Size of Heap Commit: " << header.winHead.sizeOfHeapCommit << endl;
-    cout << "  [*] Loader Flags: " << header.winHead.loaderFlags << endl;
-    cout << "  [*] Number of Rva and Sizes: " << header.winHead.numOfRvaAndSizes<< endl;
+    printf("  [*] Image Base: 0x%lx (PE32+)\n", header->winHead.imageBase);
+    std::cout << "  [*] Section Alignment: " << header->winHead.sectionAlignment << endl;
+    std::cout << "  [*] File Alignment: " << header->winHead.fileAlignment << endl;
+    std::cout << "  [*] Major OS Version: " << header->winHead.majorOSVersion << endl;
+    std::cout << "  [*] Minor OS Version: " << header->winHead.minorOSVersion << endl;
+    std::cout << "  [*] Major Subsys. Version: " << header->winHead.majorSubsysVersion << endl;
+    std::cout << "  [*] Minor Subsys. Version: " << header->winHead.minotSubsysVersion << endl;
+    std::cout << "  [*] Win32 Version Value: " << header->winHead.win32VersionValue << endl;
+    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << endl;
+    std::cout << "  [*] Checksum: " << header->winHead.checkSum << endl;
+    std::cout << "  [*] Subsystem: " << subsystem[header->winHead.subsystem] << endl;
+    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << endl;
+    std::cout << "  [*] Dll Characteristics: " << getDLLChars(header->winHead.dllCharacteristics) << endl;
+    std::cout << "  [*] Size of Stack Reserve: " << header->winHead.sizeOfStackReserve << endl;
+    std::cout << "  [*] Size of Stack Commit: " << header->winHead.sizeOfStackCommit << endl;
+    std::cout << "  [*] Size of Heap Reserve: " << header->winHead.sizeOfHeapReserve << endl;
+    std::cout << "  [*] Size of Heap Commit: " << header->winHead.sizeOfHeapCommit << endl;
+    std::cout << "  [*] Loader Flags: " << header->winHead.loaderFlags << endl;
+    std::cout << "  [*] Number of Rva and Sizes: " << header->winHead.numOfRvaAndSizes<< endl;
 }
 
-void printDataDirectories(ImageDataDirectoryEntry entries[], int numOf) {
-    cout << " +---------------------------------------------------------------------------+" << endl;
-    cout << " |##########            Optional Header Data Directories           ##########|" << endl;
-    cout << " +---------------------------------------------------------------------------+" << endl;
+void printDataDirectories(ImageDataDirectoryEntry *entries, uint32_t numOf) {
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########            Optional Header Data Directories           ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
     string table[] = {"Export Table", "Import Table", "Resource Table", "Exception Table", "Certificate Table", "Base Relocation Table", "Debug", "Architecture", "Global Ptr", "TLS Table", "Load Config Table", "Bound Import", "IAT", "Delay Import Descriptor", "CLR Runtime Header"};
-    for (int i = 0; i < numOf - 1; i++) {
-        cout << "  [*] " << table[i] << ": {RVA: " << entries[i].VA << ", Size: " << entries[i].size << "}\n";
+    for (uint32_t i = 0; i < numOf - 1; i++) {
+        std::cout << "  [*] " << table[i] << ": {RVA: " << entries[i].VA << ", Size: " << entries[i].size << "}\n";
     }
 }

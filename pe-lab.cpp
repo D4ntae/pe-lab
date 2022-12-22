@@ -1,13 +1,15 @@
 #include <iostream>
 #include <fstream>
 #include "pe-lab-lib.h"
+#include <cstdint>
+#include <map>
 
 using namespace std;
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
         cerr << "No file name passed." << endl;
-        cout << "Usage: pe-lab <filename>";
+        std::cout << "Usage: pe-lab <filename>";
         return 1;
     }
 
@@ -18,7 +20,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    int peOffset = 0;
+    uint32_t peOffset = 0;
     char *pe = new char[4];
     infile.seekg(0x3c, ios::beg);
     infile.read((char *)&peOffset, 4);
@@ -31,68 +33,93 @@ int main(int argc, char* argv[]) {
     delete [] pe;
 
     // Read COFF Header
-    COFFHeader coffHeader;
-    infile.seekg(peOffset + 4, ios::beg);
-    infile.read((char *)&coffHeader, sizeof(COFFHeader));
-    printCOFFHeaderInfo(coffHeader);
+    /*
 
-    // Read Optional Header
+    */
+    COFFHeader coffHeader;
+    infile.seekg(peOffset + 4, ios::beg); // COFF Header starts right after PE signature
+    infile.read((char *)&coffHeader, sizeof(COFFHeader));
+    printCOFFHeaderInfo(&coffHeader);
+    uint16_t magic = 0;
+    uint32_t baseOfCode = 0;
+
+    // Read Optional Header (Object file do not contain this header)
     if (coffHeader.sizeOfOptionalHeader) {
         infile.seekg(peOffset + 4 + sizeof(COFFHeader), ios::beg); // Optional header is right after COFF
-        short magic = 0;
-        infile.read((char *)&magic, 2);
+        infile.read((char *)&magic, 2); // Magic is the start of the optional header, determines PE type
         if (magic == 0x20b) { // PE32+
             PE32PlusOptionalHeader optionalHeader;
             infile.seekg(peOffset + 4 + sizeof(COFFHeader), ios::beg);
-            infile.read((char *)&optionalHeader, sizeof(PE32PlusOptionalHeader));
-            printOptionalHeader(optionalHeader);
+            infile.read((char *)&optionalHeader, sizeof(PE32PlusOptionalHeader)); // Read all info from Optional Header
+            printOptionalHeader(&optionalHeader);
+            baseOfCode = optionalHeader.standardHead.baseOfCode;
             
-            int dataDirOffset = peOffset + 4 + sizeof(COFFHeader) + sizeof(PE32PlusOptionalHeader);
+            uint32_t dataDirOffset = peOffset + 4 + sizeof(COFFHeader) + sizeof(PE32PlusOptionalHeader);
+
             // Data part of optional headerd
-            ImageDataDirectoryEntry entries[optionalHeader.winHead.numOfRvaAndSizes];
+            ImageDataDirectoryEntry *entries = new ImageDataDirectoryEntry[optionalHeader.winHead.numOfRvaAndSizes];
             ImageDataDirectoryEntry idDir;
-            for (int i = 0; i < optionalHeader.winHead.numOfRvaAndSizes; i++) {
+            for (uint32_t i = 0; i < optionalHeader.winHead.numOfRvaAndSizes; i++) {
                 infile.seekg(dataDirOffset + i * sizeof(ImageDataDirectoryEntry), ios::beg);
                 infile.read((char *)&idDir, sizeof(ImageDataDirectoryEntry));
                 entries[i] = idDir;
             }
             printDataDirectories(entries, optionalHeader.winHead.numOfRvaAndSizes);
-
-            // Section Table
-            int sectionTableOffset = peOffset + 4 + sizeof(COFFHeader) + coffHeader.sizeOfOptionalHeader;
-            infile.seekg(sectionTableOffset, ios::beg);
-            SectionTableEntry e;
-            infile.read((char *)&e, sizeof(SectionTableEntry));
-            cout << e.name;
-
         } else { // PE32
             PE32OptionalHeader optionalHeader;
             infile.seekg(peOffset + 4 + sizeof(COFFHeader), ios::beg);
             infile.read((char *)&optionalHeader, sizeof(PE32OptionalHeader));
-            printOptionalHeader(optionalHeader);
+            printOptionalHeader(&optionalHeader);
+            baseOfCode = optionalHeader.standardHead.baseOfCode;
 
             // Data part of optional header
 
-            int dataDirOffset = peOffset + 4 + sizeof(COFFHeader) + sizeof(PE32PlusOptionalHeader);
+            uint32_t dataDirOffset = peOffset + 4 + sizeof(COFFHeader) + sizeof(PE32PlusOptionalHeader);
             // Data part of optional headerd
-            ImageDataDirectoryEntry entries[optionalHeader.winHead.numOfRvaAndSizes];
+            ImageDataDirectoryEntry *entries = new ImageDataDirectoryEntry[optionalHeader.winHead.numOfRvaAndSizes];
             ImageDataDirectoryEntry idDir;
-            for (int i = 0; i < optionalHeader.winHead.numOfRvaAndSizes; i++) {
+            for (uint32_t i = 0; i < optionalHeader.winHead.numOfRvaAndSizes; i++) {
                 infile.seekg(dataDirOffset + i * sizeof(ImageDataDirectoryEntry), ios::beg);
                 infile.read((char *)&idDir, sizeof(ImageDataDirectoryEntry));
                 entries[i] = idDir;
             }
             printDataDirectories(entries, optionalHeader.winHead.numOfRvaAndSizes);
-
-            // Section Table
-            int sectionTableOffset = peOffset + 4 + sizeof(COFFHeader) + coffHeader.sizeOfOptionalHeader;
-            infile.seekg(sectionTableOffset, ios::beg);
-            SectionTableEntry e;
-            infile.read((char *)&e, sizeof(SectionTableEntry));
-            e.name[8] = '\0';
-            cout << e.name;
         }
     }
 
+    // Section Table
+    uint32_t sectionTableOffset = peOffset + 4 + sizeof(COFFHeader) + coffHeader.sizeOfOptionalHeader; // Located right after the optional header
+    infile.seekg(sectionTableOffset, ios::beg);
+
+    uint32_t pIDT;
+    uint32_t importVA;
+    SectionTableEntry *sectionEntries = new SectionTableEntry[coffHeader.numOfSections];
+    for (int i = 0; i < coffHeader.numOfSections; i++) {
+        infile.seekg(sectionTableOffset + sizeof(SectionTableEntry) * i, ios::beg);
+        SectionTableEntry e;
+        infile.read((char *)&e, sizeof(SectionTableEntry));
+        sectionEntries[i] = e;
+        if (namecmp(&e.name[0], ".idata")) {
+            pIDT = e.pToRawData;
+            importVA = e.virtualAddress;
+        }
+    }
+
+    printSectionTableInfo(sectionEntries, coffHeader.numOfSections);
+
+    // Import Directory Table
+    infile.seekg(pIDT, ios::beg);
+    ImportDirectoryTableEntry e;
+    int i = 0;
+    while (true) {
+        infile.seekg(pIDT + sizeof(ImportDirectoryTableEntry) * i, ios::beg);
+        ImportDirectoryTableEntry e;
+        infile.read((char *)&e, sizeof(ImportDirectoryTableEntry));
+        if (e.IAT_RVA == 0) break;
+        
+        string name = readAscii(infile, (e.nameRVA - importVA) + pIDT);
+        cout << name << endl;
+        i++;
+    };
     return 0;
 }
