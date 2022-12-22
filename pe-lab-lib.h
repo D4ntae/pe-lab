@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <fstream>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 
@@ -131,6 +132,15 @@ struct ILTEntryPE32 {
 
 struct ILTEntryPE32Plus {
 
+};
+
+struct DllNameFunctionNumber {
+    string name;
+    int numOfFunctions;
+
+    bool operator <(const DllNameFunctionNumber &other)const {
+        return name < other.name;
+    }
 };
 
 struct HintTableEntry {
@@ -404,13 +414,13 @@ void printDataDirectories(ImageDataDirectoryEntry *entries, uint32_t numOf) {
     }
 }
 
-void printImports(map<string, vector<HintTableEntry>> *imports) {
+void printImports(map<DllNameFunctionNumber, vector<HintTableEntry>> *imports) {
     std::cout << " +---------------------------------------------------------------------------+" << endl;
     std::cout << " |##########                        Imports                        ##########|" << endl;
     std::cout << " +---------------------------------------------------------------------------+" << endl;
 
-    for (map<string, vector<HintTableEntry>>::iterator it = imports->begin(); it != imports->end(); it++) {
-        std::cout << "  [*] DLL Name: " << it->first << endl;
+    for (map<DllNameFunctionNumber, vector<HintTableEntry>>::iterator it = imports->begin(); it != imports->end(); it++) {
+        std::cout << "  [*] DLL Name: " << it->first.name << " " << "(" << it->first.numOfFunctions << " functions)" << endl;
         for (vector<HintTableEntry>::iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
             std::cout << "   - Name: " << it2->name;
             printf(" (Hint: %x)\n", it2->hint);

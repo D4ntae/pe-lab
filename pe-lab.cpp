@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
     ImportDirectoryTableEntry e;
     int i = 0;
     vector<string> dllNames;
-    map<string, vector<HintTableEntry>> *imports = new map<string, vector<HintTableEntry>>();
+    map<DllNameFunctionNumber, vector<HintTableEntry>> *imports = new map<DllNameFunctionNumber, vector<HintTableEntry>>();
     while (true) {
         vector<HintTableEntry> entries;
         infile.seekg(pIDT + sizeof(ImportDirectoryTableEntry) * i, ios::beg);
@@ -126,81 +126,60 @@ int main(int argc, char* argv[]) {
         
         string dllName = readAscii(infile, (e.nameRVA - importVA) + pIDT);
         dllNames.push_back(dllName);
-        infile.seekg((e.IAT_RVA - importVA) + pIDT, ios::beg);
-        string name;
 
-        if (magic == 0x20b) {
+
+        if (magic == 0x20b) {        
+            string name;
+            int importCounter = 0;
             uint64_t ilt = 0;
-            infile.read((char *)&ilt, 8);
-            if (ilt & 0x8000000000000000) {
-                cout << "No import info available" << endl;
-                continue;
-            }
-            // Hint table reading
-            uint16_t hint = 0;
-            string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
-            bool pad = false;
-
-            infile.seekg((ilt - importVA) + pIDT, ios::beg);
-            infile.read((char *)&hint, 2);
-            infile.seekg((ilt - importVA) + pIDT + 2 + name.length() + 1, ios::beg);
-            infile.read((char *)&pad, 1);
-            pad = pad == 0 ? true : false;
-            HintTableEntry *e = new HintTableEntry(hint, name, pad);
-            int nextOffset = sizeof(uint16_t) + e->name.length() + 1 * e->pad;
-            entries.push_back(*e);
-            delete e;
             while (true) {
-                int nextEntryOffset = (ilt - importVA) + pIDT + nextOffset;
-                infile.seekg(nextEntryOffset, ios::beg);
+                infile.seekg((e.ILT_RVA - importVA) + pIDT + importCounter * 8, ios::beg); // seek to import lookup table
+                infile.read((char *)&ilt, 8);
+                if (ilt & 0x8000000000000000) {
+                    cout << "No import info available" << endl;
+                    break;;
+                }
+                if (ilt == 0) break;
+                // Hint table reading
+                uint16_t hint = 0;
+                string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
+                bool pad = false;
+                infile.seekg((ilt - importVA) + pIDT, ios::beg);
                 infile.read((char *)&hint, 2);
-                if (hint == 0) break;
-                name = readAscii(infile, nextEntryOffset + 2);
-                infile.seekg(nextEntryOffset + 2 + name.length(), ios::beg);
-                infile.read((char *)&pad, 1);
-                pad = pad == 0 ? true : false;
-                e = new HintTableEntry(hint, name, pad);
-                nextOffset += 2 + e->name.length() + 1 * e->pad;
+                HintTableEntry *e = new HintTableEntry(hint, name, pad);
                 entries.push_back(*e);
-                delete e;
+                importCounter++;
             }
-            imports->insert({dllName, entries});
+            DllNameFunctionNumber member;
+            member.name = dllName;
+            member.numOfFunctions = importCounter;
+            imports->insert({member, entries});
         } else {
+            string name;
+            int importCounter = 0;
             uint32_t ilt = 0;
-            infile.read((char *)&ilt, 8);
-            if (ilt & 0x80000000) {
-                cout << "No import info available" << endl;
-                continue;
-            }
-            // Hint table reading
-            uint16_t hint = 0;
-            string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
-            bool pad = false;
-
-            infile.seekg((ilt - importVA) + pIDT, ios::beg);
-            infile.read((char *)&hint, 2);
-            infile.seekg((ilt - importVA) + pIDT + 2 + name.length() + 1, ios::beg);
-            infile.read((char *)&pad, 1);
-            pad = pad == 0 ? true : false;
-            HintTableEntry *e = new HintTableEntry(hint, name, pad);
-            int nextOffset = sizeof(uint16_t) + e->name.length() + 1 * e->pad;
-            entries.push_back(*e);
-            delete e;
             while (true) {
-                int nextEntryOffset = (ilt - importVA) + pIDT + nextOffset;
-                infile.seekg(nextEntryOffset, ios::beg);
+                infile.seekg((e.ILT_RVA - importVA) + pIDT + importCounter * 4, ios::beg); // seek to import lookup table
+                infile.read((char *)&ilt, 8);
+                if (ilt & 0x80000000) {
+                    cout << "No import info available" << endl;
+                    break;;
+                }
+                if (ilt == 0) break;
+                // Hint table reading
+                uint16_t hint = 0;
+                string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
+                bool pad = false;
+                infile.seekg((ilt - importVA) + pIDT, ios::beg);
                 infile.read((char *)&hint, 2);
-                if (hint == 0) break;
-                name = readAscii(infile, nextEntryOffset + 2);
-                infile.seekg(nextEntryOffset + 2 + name.length(), ios::beg);
-                infile.read((char *)&pad, 1);
-                pad = pad == 0 ? true : false;
-                e = new HintTableEntry(hint, name, pad);
-                nextOffset += 2 + e->name.length() + 1 * e->pad;
+                HintTableEntry *e = new HintTableEntry(hint, name, pad);
                 entries.push_back(*e);
-                delete e;
+                importCounter++;
             }
-            imports->insert({dllName, entries});
+            DllNameFunctionNumber member;
+            member.name = dllName;
+            member.numOfFunctions = importCounter;
+            imports->insert({member, entries});
         }
         i++;
     };
