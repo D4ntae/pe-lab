@@ -3,6 +3,8 @@
 #include "pe-lab-lib.h"
 #include <cstdint>
 #include <map>
+#include <vector>
+#include <memory>
 
 using namespace std;
 
@@ -65,6 +67,7 @@ int main(int argc, char* argv[]) {
                 entries[i] = idDir;
             }
             printDataDirectories(entries, optionalHeader.winHead.numOfRvaAndSizes);
+            delete[] entries;
         } else { // PE32
             PE32OptionalHeader optionalHeader;
             infile.seekg(peOffset + 4 + sizeof(COFFHeader), ios::beg);
@@ -84,6 +87,7 @@ int main(int argc, char* argv[]) {
                 entries[i] = idDir;
             }
             printDataDirectories(entries, optionalHeader.winHead.numOfRvaAndSizes);
+            delete[] entries;
         }
     }
 
@@ -106,20 +110,101 @@ int main(int argc, char* argv[]) {
     }
 
     printSectionTableInfo(sectionEntries, coffHeader.numOfSections);
-
+    delete[] sectionEntries;
     // Import Directory Table
     infile.seekg(pIDT, ios::beg);
     ImportDirectoryTableEntry e;
     int i = 0;
+    vector<string> dllNames;
+    map<string, vector<HintTableEntry>> *imports = new map<string, vector<HintTableEntry>>();
     while (true) {
+        vector<HintTableEntry> entries;
         infile.seekg(pIDT + sizeof(ImportDirectoryTableEntry) * i, ios::beg);
         ImportDirectoryTableEntry e;
         infile.read((char *)&e, sizeof(ImportDirectoryTableEntry));
         if (e.IAT_RVA == 0) break;
         
-        string name = readAscii(infile, (e.nameRVA - importVA) + pIDT);
-        cout << name << endl;
+        string dllName = readAscii(infile, (e.nameRVA - importVA) + pIDT);
+        dllNames.push_back(dllName);
+        infile.seekg((e.IAT_RVA - importVA) + pIDT, ios::beg);
+        string name;
+
+        if (magic == 0x20b) {
+            uint64_t ilt = 0;
+            infile.read((char *)&ilt, 8);
+            if (ilt & 0x8000000000000000) {
+                cout << "No import info available" << endl;
+                continue;
+            }
+            // Hint table reading
+            uint16_t hint = 0;
+            string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
+            bool pad = false;
+
+            infile.seekg((ilt - importVA) + pIDT, ios::beg);
+            infile.read((char *)&hint, 2);
+            infile.seekg((ilt - importVA) + pIDT + 2 + name.length() + 1, ios::beg);
+            infile.read((char *)&pad, 1);
+            pad = pad == 0 ? true : false;
+            HintTableEntry *e = new HintTableEntry(hint, name, pad);
+            int nextOffset = sizeof(uint16_t) + e->name.length() + 1 * e->pad;
+            entries.push_back(*e);
+            delete e;
+            while (true) {
+                int nextEntryOffset = (ilt - importVA) + pIDT + nextOffset;
+                infile.seekg(nextEntryOffset, ios::beg);
+                infile.read((char *)&hint, 2);
+                if (hint == 0) break;
+                name = readAscii(infile, nextEntryOffset + 2);
+                infile.seekg(nextEntryOffset + 2 + name.length(), ios::beg);
+                infile.read((char *)&pad, 1);
+                pad = pad == 0 ? true : false;
+                e = new HintTableEntry(hint, name, pad);
+                nextOffset += 2 + e->name.length() + 1 * e->pad;
+                entries.push_back(*e);
+                delete e;
+            }
+            imports->insert({dllName, entries});
+        } else {
+            uint32_t ilt = 0;
+            infile.read((char *)&ilt, 8);
+            if (ilt & 0x80000000) {
+                cout << "No import info available" << endl;
+                continue;
+            }
+            // Hint table reading
+            uint16_t hint = 0;
+            string name = readAscii(infile, (ilt - importVA) + pIDT + sizeof(uint16_t));
+            bool pad = false;
+
+            infile.seekg((ilt - importVA) + pIDT, ios::beg);
+            infile.read((char *)&hint, 2);
+            infile.seekg((ilt - importVA) + pIDT + 2 + name.length() + 1, ios::beg);
+            infile.read((char *)&pad, 1);
+            pad = pad == 0 ? true : false;
+            HintTableEntry *e = new HintTableEntry(hint, name, pad);
+            int nextOffset = sizeof(uint16_t) + e->name.length() + 1 * e->pad;
+            entries.push_back(*e);
+            delete e;
+            while (true) {
+                int nextEntryOffset = (ilt - importVA) + pIDT + nextOffset;
+                infile.seekg(nextEntryOffset, ios::beg);
+                infile.read((char *)&hint, 2);
+                if (hint == 0) break;
+                name = readAscii(infile, nextEntryOffset + 2);
+                infile.seekg(nextEntryOffset + 2 + name.length(), ios::beg);
+                infile.read((char *)&pad, 1);
+                pad = pad == 0 ? true : false;
+                e = new HintTableEntry(hint, name, pad);
+                nextOffset += 2 + e->name.length() + 1 * e->pad;
+                entries.push_back(*e);
+                delete e;
+            }
+            imports->insert({dllName, entries});
+        }
         i++;
     };
+
+    printImports(imports);
     return 0;
 }

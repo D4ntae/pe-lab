@@ -4,6 +4,7 @@
 #include <map>
 #include <cstdint>
 #include <fstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -130,6 +131,19 @@ struct ILTEntryPE32 {
 
 struct ILTEntryPE32Plus {
 
+};
+
+struct HintTableEntry {
+    uint16_t hint;
+    string name;
+    bool pad;
+
+    HintTableEntry() {}
+    HintTableEntry(uint16_t hint, string name, bool pad) {
+        this->hint = hint;
+        this->name = name;
+        this->pad = pad;
+    }
 };
 
 map<uint16_t, const char *> machineType = {
@@ -259,6 +273,24 @@ string readAscii(ifstream &infile, int offset) {
     return ret;
 }
 
+const string WHITESPACE = " \n\r\t\f\v";
+
+string ltrim(const string &s)
+{
+    size_t start = s.find_first_not_of(WHITESPACE);
+    return (start == string::npos) ? "" : s.substr(start);
+}
+
+string rtrim(const string &s)
+{
+    size_t end = s.find_last_not_of(WHITESPACE);
+    return (end == string::npos) ? "" : s.substr(0, end + 1);
+}
+
+string trim(const string &s) {
+    return rtrim(ltrim(s));
+}
+
 void printCOFFHeaderInfo(COFFHeader *header) {
     std::cout << " +---------------------------------------------------------------------------+" << endl;
     std::cout << " |##########                   COFF Header Info                    ##########|" << endl;
@@ -369,5 +401,19 @@ void printDataDirectories(ImageDataDirectoryEntry *entries, uint32_t numOf) {
     string table[] = {"Export Table", "Import Table", "Resource Table", "Exception Table", "Certificate Table", "Base Relocation Table", "Debug", "Architecture", "Global Ptr", "TLS Table", "Load Config Table", "Bound Import", "IAT", "Delay Import Descriptor", "CLR Runtime Header"};
     for (uint32_t i = 0; i < numOf - 1; i++) {
         std::cout << "  [*] " << table[i] << ": {RVA: " << entries[i].VA << ", Size: " << entries[i].size << "}\n";
+    }
+}
+
+void printImports(map<string, vector<HintTableEntry>> *imports) {
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+    std::cout << " |##########                        Imports                        ##########|" << endl;
+    std::cout << " +---------------------------------------------------------------------------+" << endl;
+
+    for (map<string, vector<HintTableEntry>>::iterator it = imports->begin(); it != imports->end(); it++) {
+        std::cout << "  [*] DLL Name: " << it->first << endl;
+        for (vector<HintTableEntry>::iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+            std::cout << "   - Name: " << it2->name;
+            printf(" (Hint: %x)\n", it2->hint);
+        }
     }
 }
