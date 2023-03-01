@@ -8,6 +8,92 @@
 
 using namespace std;
 
+class PEFile {    
+    struct Offsets {
+        uint32_t peOffset;
+        uint32_t COFFOffset;
+        uint32_t OptionalHeaderOffset;
+        bool is64bit;
+    };
+
+    ifstream *infile;
+    Offsets *offsets = new Offsets();
+    COFFHeader *coffHeader = new COFFHeader();
+    PE32OptionalHeader *optionalHeader32bit = nullptr;
+    PE32PlusOptionalHeader *optionalHeader64bit = nullptr;
+
+    // Seeks inside PE file currently pointed to by infile
+    void seek(uint32_t offset) {
+        infile->seekg(offset, ios::beg);
+    }
+
+public:
+
+    int initialParse() {
+        // Parse location of PE signature
+        seek(0x3c);
+        infile->read((char *)&(offsets->peOffset), 4);
+        
+        // Parse the signature
+        char *pe = new char[4];
+        seek(offsets->peOffset);
+        infile->read(pe, 4);
+        if (!(pe[0] == 'P' && pe[1] == 'E' && pe[2] == '\0' && pe[3] == '\0')) {
+            cerr << "Invalid PE signature. Terminating\n";
+            return 0;
+        }
+        delete [] pe;
+
+        // COFFHeader is right after PE signature
+        offsets->COFFOffset = offsets->peOffset + 4;
+        // OptionalHeader is right after COFFHeader
+        offsets->OptionalHeaderOffset = offsets->COFFOffset + sizeof(COFFHeader);
+
+        // OptionalHeader start determines if the file is 32 or 64 bit
+        uint16_t magic = 0;
+        seek(offsets->OptionalHeaderOffset);
+        infile->read((char *)&magic, 2);
+
+        if (magic == 0x20b) {
+            offsets->is64bit = true;
+        } else if (magic == 0x10b) {
+            offsets->is64bit = false;
+        } else {
+            cerr << "Invalid OptionalHeader magic number. Terminating\n";
+            return 0;
+        }
+
+        return 1;
+    }
+
+    void parseCOFF() {
+        seek(offsets->COFFOffset);
+        infile->read((char *)coffHeader, sizeof(COFFHeader));
+    }
+
+    void parseOptionalHeader() {
+        seek(offsets->OptionalHeaderOffset);
+        if (offsets->is64bit) {
+            infile->read((char *)optionalHeader64bit, sizeof(PE32PlusOptionalHeader));
+        } else {
+            infile->read((char *)optionalHeader32bit, sizeof(PE32OptionalHeader));
+        }
+    }
+
+    PEFile(ifstream *infile) {
+        this->infile = infile;
+
+        // Fills up initial offsets and info
+        int valid = initialParse();
+
+        if (!valid) {
+            throw invalid_argument("Parsing Error"); // TODO
+        }
+
+
+    }
+};
+
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
         cerr << "No file name passed." << endl;
