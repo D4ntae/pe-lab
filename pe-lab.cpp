@@ -9,22 +9,33 @@
 using namespace std;
 
 class PEFile {    
-    struct Offsets {
+    struct ParsingInfo {
         uint32_t peOffset;
         uint32_t COFFOffset;
         uint32_t OptionalHeaderOffset;
+        uint32_t DataDirectoryOffset;
+        uint32_t SectiontableOffset;
         bool is64bit;
+        uint32_t numOfRVAandSizes;
+        uint16_t numOfSections;
     };
 
     ifstream *infile;
-    Offsets *offsets = new Offsets();
+    ParsingInfo *parsingInfo = new ParsingInfo();
     COFFHeader *coffHeader = new COFFHeader();
     PE32OptionalHeader *optionalHeader32bit = nullptr;
     PE32PlusOptionalHeader *optionalHeader64bit = nullptr;
+    ImageDataDirectoryEntry *dataDirectoryTable = nullptr;
+    SectionTableEntry *sectionTable = nullptr;
 
     // Seeks inside PE file currently pointed to by infile
     void seek(uint32_t offset) {
         infile->seekg(offset, ios::beg);
+    }
+
+    // Reads from PE file currently pointed to by infile
+    void read(char *location) {
+        infile->read(location, sizeof(*location));
     }
 
 public:
@@ -32,12 +43,12 @@ public:
     int initialParse() {
         // Parse location of PE signature
         seek(0x3c);
-        infile->read((char *)&(offsets->peOffset), 4);
+        read((char *)&(parsingInfo->peOffset));
         
         // Parse the signature
         char *pe = new char[4];
-        seek(offsets->peOffset);
-        infile->read(pe, 4);
+        seek(parsingInfo->peOffset);
+        read(pe);
         if (!(pe[0] == 'P' && pe[1] == 'E' && pe[2] == '\0' && pe[3] == '\0')) {
             cerr << "Invalid PE signature. Terminating\n";
             return 0;
@@ -45,39 +56,106 @@ public:
         delete [] pe;
 
         // COFFHeader is right after PE signature
-        offsets->COFFOffset = offsets->peOffset + 4;
+        parsingInfo->COFFOffset = parsingInfo->peOffset + 4;
         // OptionalHeader is right after COFFHeader
-        offsets->OptionalHeaderOffset = offsets->COFFOffset + sizeof(COFFHeader);
+        parsingInfo->OptionalHeaderOffset = parsingInfo->COFFOffset + sizeof(COFFHeader);
 
         // OptionalHeader start determines if the file is 32 or 64 bit
         uint16_t magic = 0;
-        seek(offsets->OptionalHeaderOffset);
-        infile->read((char *)&magic, 2);
+        seek(parsingInfo->OptionalHeaderOffset);
+        read((char *)&magic);
 
         if (magic == 0x20b) {
-            offsets->is64bit = true;
+            parsingInfo->is64bit = true;
+            parsingInfo->numOfRVAandSizes = parsingInfo->OptionalHeaderOffset + sizeof(PE32PlusOptionalHeader) - 4;
+            parsingInfo->DataDirectoryOffset = parsingInfo->OptionalHeaderOffset + sizeof(PE32PlusOptionalHeader);
+
         } else if (magic == 0x10b) {
-            offsets->is64bit = false;
+            parsingInfo->is64bit = false;
+            parsingInfo->numOfRVAandSizes = parsingInfo->OptionalHeaderOffset + sizeof(PE32OptionalHeader) - 4;
+            parsingInfo->DataDirectoryOffset = parsingInfo->OptionalHeaderOffset + sizeof(PE32OptionalHeader);
         } else {
             cerr << "Invalid OptionalHeader magic number. Terminating\n";
             return 0;
         }
 
+        // Parse number of RVA and sizes needed for data directories
+        seek(parsingInfo->numOfRVAandSizes);
+        read((char *)&parsingInfo->numOfRVAandSizes);
+
+        // SectionTable offset
+        uint16_t optionalSize = 0;
+        seek(parsingInfo->COFFOffset + 16); // location of sizeOfOptionalHeader
+        read((char *)&optionalSize);
+        parsingInfo->SectiontableOffset = parsingInfo->COFFOffset + sizeof(COFFHeader) + optionalSize;
+
+        // Size of section table
+        uint16_t num = 0;
+        seek(parsingInfo->COFFOffset + 2);
+        read((char *)&num);
+        parsingInfo->numOfSections = num;
+
+
         return 1;
     }
 
     void parseCOFF() {
-        seek(offsets->COFFOffset);
-        infile->read((char *)coffHeader, sizeof(COFFHeader));
+        seek(parsingInfo->COFFOffset);
+        read((char *)coffHeader);
     }
 
     void parseOptionalHeader() {
-        seek(offsets->OptionalHeaderOffset);
-        if (offsets->is64bit) {
-            infile->read((char *)optionalHeader64bit, sizeof(PE32PlusOptionalHeader));
+        seek(parsingInfo->OptionalHeaderOffset);
+        if (parsingInfo->is64bit) {
+            read((char *)optionalHeader64bit);
         } else {
-            infile->read((char *)optionalHeader32bit, sizeof(PE32OptionalHeader));
+            read((char *)optionalHeader32bit);
         }
+    }
+
+    void parseDataDirectories() {
+        if (parsingInfo->numOfRVAandSizes != 0) {
+            dataDirectoryTable = new ImageDataDirectoryEntry[parsingInfo->numOfRVAandSizes];
+            ImageDataDirectoryEntry idDir;
+            for (int i = 0; i < parsingInfo->numOfRVAandSizes; i++) {
+                seek(parsingInfo->DataDirectoryOffset + i * sizeof(ImageDataDirectoryEntry));
+                read((char *)&idDir);
+                dataDirectoryTable[i] = idDir;
+            }
+        }
+    }
+
+    void parseSectionTable() {
+        sectionTable = new SectionTableEntry[parsingInfo->numOfSections];
+        SectionTableEntry e;
+        for (int i = 0; i < parsingInfo->numOfSections; i++) {
+            seek(parsingInfo->SectiontableOffset + i * sizeof(SectionTableEntry));
+            read((char *)&e);
+            sectionTable[i] = e;
+        }
+    }
+
+    void parseImportTable() {
+        parseSectionTable();
+
+        // Used for offset calculations, pIDT points to the beginning of the
+        // import section in the file, and the virtual address can be used
+        // to calculate the offset to other parts of the table as it is the
+        // virtual address of the beginning of the file
+        uint32_t pIDT;
+        uint32_t importVA;
+        
+        SectionTableEntry e;
+        for (int i = 0; i < parsingInfo->numOfSections; i++) {
+            e = sectionTable[i];
+            if (namecmp(e.name, ".idata")) {
+                pIDT = e.pToRawData;
+                importVA = e.virtualAddress;
+                break;
+            }
+        }
+
+        
     }
 
     PEFile(ifstream *infile) {
