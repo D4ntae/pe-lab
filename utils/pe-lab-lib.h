@@ -1,4 +1,5 @@
 #ifndef LIB
+#define LIB
 
 #include <iostream>
 #include <time.h>

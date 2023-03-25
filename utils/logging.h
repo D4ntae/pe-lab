@@ -1,4 +1,5 @@
 #ifndef LOGGING
+#define LOGGING
 
 #include "pe-lab-lib.h"
 #include <iostream>

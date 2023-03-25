@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 char* getTime(uint32_t timestamp) {
     time_t a = timestamp;

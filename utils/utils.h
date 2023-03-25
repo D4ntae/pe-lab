@@ -1,4 +1,6 @@
 #ifndef UTILS
+#define UTILS
+
 #include <string>
 #include <fstream>
 #include <time.h>

@@ -1,11 +1,13 @@
 #include <iostream>
 #include <fstream>
-#include "../utils/pe-lab-lib.h"
 #include <cstdint>
 #include <map>
 #include <vector>
 #include <memory>
 
+#include "../utils/pe-lab-lib.h"
+#include "../utils/utils.h"
+#include "../utils/logging.h"
 
 class Parser {    
     struct ParsingInfo {
