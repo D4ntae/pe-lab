@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include "pe-lab-lib.h"
+#include "../pe-lab-lib.h"
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -200,7 +200,6 @@ int main(int argc, char* argv[]) {
 
     // Read COFF Header
     /*
-
     */
     COFFHeader coffHeader;
     infile.seekg(peOffset + 4, ios::beg); // COFF Header starts right after PE signature

@@ -1,9 +1,5 @@
-pe-lab
-simple.exe
-token
-token2
-hexdump
-.vscode
-test
-test.cpp
-pe-lab.exe
+./bak
+./parsing/.vscode/
+./parsing/zadatak_1
+./parsing/parser
+
