@@ -111,10 +111,16 @@ void printSectionTableInfo(std::vector<SectionTableEntry> entries, uint32_t len)
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                   Section Table Info                  ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
-    std::cout << "Hello";
-    std::cout << len;
     for (uint32_t i = 0; i < len; i++) {
         std::cout << "  [*] Name: " << std::setw(6) << entries[i].name << std::setfill(' ') << std::setw(5) << getSectionEntryChars(&entries[i]) << std::endl;
+        std::cout << "  \t [+] Virtual size: " << entries[i].virtualSize << "\n";
+        std::cout << "  \t [+] Virtual address: " << entries[i].virtualAddress << "\n";
+        std::cout << "  \t [+] Size of raw data: " << entries[i].sizeOfRawData << "\n";
+        std::cout << "  \t [+] Pointer to raw data: " << entries[i].pToRawData << "\n";
+        std::cout << "  \t [+] Pointer to relocations: " << entries[i].pToRelocations << "\n";
+        std::cout << "  \t [+] Pointer to line numbers: " << entries[i].pToLinenumbers << "\n";
+        std::cout << "  \t [+] Number of relocations: " << entries[i].numOfRelocations << "\n";
+        std::cout << "  \t [+] Number of line numbers: " << entries[i].numOfLinenumbers << "\n";
     }
 }
 

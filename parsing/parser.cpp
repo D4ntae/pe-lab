@@ -28,6 +28,7 @@ class Parser {
     std::unique_ptr<PE32PlusOptionalHeader> optionalHeader64bit = std::make_unique<PE32PlusOptionalHeader>();
     std::vector<ImageDataDirectoryEntry> dataDirectoryTable;
     std::vector<SectionTableEntry> sectionTable;
+    std::vector<ImportDirectoryTableEntry> IDT;
 
     // Seeks inside PE file currently pointed to by infile
     void seek(uint32_t offset) {
@@ -70,17 +71,36 @@ class Parser {
         }
     }
 
-    void parseSectionTable() {
+    void parseSectionTable(int numOfSections, int offset) {
         SectionTableEntry e;
-        for (int i = 0; i < parsingInfo->numOfSections; i++) {
-            seek(parsingInfo->SectiontableOffset + i * sizeof(SectionTableEntry));
+        for (int i = 0; i < numOfSections; i++) {
+            seek(offset + i * sizeof(SectionTableEntry));
             infile->read((char *)&e, sizeof(e));
             sectionTable.push_back(e);
         }
     }
 
-    void parseImportTable() {
-          
+    SectionTableEntry locateImportTable(ImageDataDirectoryEntry importDir, std::vector<SectionTableEntry> sections) {
+        SectionTableEntry importSection;
+        for (SectionTableEntry section : sections) {
+            if (importDir.VA >= section.virtualAddress && importDir.VA < section.virtualAddress + section.virtualSize) {
+                 importSection = section;
+            }
+        }
+
+        return importSection;
+    }
+
+    void parseImportTable(ImageDataDirectoryEntry importDir, std::vector<SectionTableEntry> sections) {
+        SectionTableEntry importSection = locateImportTable(importDir, sections); 
+        ImportDirectoryTableEntry e;
+        seek(importSection.pToRawData);
+        infile->read((char *)&e, sizeof(e));
+        while (e.ILT_RVA != 0) {
+            IDT.push_back(e);
+            infile->seekg(sizeof(e), std::ios::cur);
+            infile->read((char *)&e, sizeof(e));
+        }
     }
 
 public:
@@ -99,6 +119,7 @@ public:
         // COFFHeader is right after PE signature
         parsingInfo->COFFOffset = parsingInfo->peOffset + 4;
         parseCOFF(parsingInfo->COFFOffset);
+        printCOFFHeaderInfo(&*this->coffHeader);
 
         // OptionalHeader is right after COFFHeader
         parsingInfo->OptionalHeaderOffset = parsingInfo->COFFOffset + sizeof(COFFHeader);
@@ -131,9 +152,10 @@ public:
 
         
         // Parse Section Headers
-        parsingInfo->SectiontableOffset = parsingInfo->COFFOffset + coffHeader->sizeOfOptionalHeader; 
-        parseSectionTable();
+        parseSectionTable(coffHeader->numOfSections, parsingInfo->COFFOffset + sizeof(COFFHeader) + coffHeader->sizeOfOptionalHeader);
         printSectionTableInfo(sectionTable, coffHeader->numOfSections);
+
+        parseImportTable(dataDirectoryTable[1], sectionTable);
         return 1;
     }
 
