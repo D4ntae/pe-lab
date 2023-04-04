@@ -1,5 +1,6 @@
 #include "pe-lab-lib.h"
 #include "utils.h"
+#include <vector>
 
 std::map<uint16_t, const char *> machineType = {
     {0x0, "Machine Unknown"},
@@ -106,10 +107,12 @@ std::string getSectionEntryChars(SectionTableEntry *entry) {
     return ret;
 }
 
-void printSectionTableInfo(SectionTableEntry *entries, uint32_t len) {
+void printSectionTableInfo(std::vector<SectionTableEntry> entries, uint32_t len) {
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                   Section Table Info                  ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
+    std::cout << "Hello";
+    std::cout << len;
     for (uint32_t i = 0; i < len; i++) {
         std::cout << "  [*] Name: " << std::setw(6) << entries[i].name << std::setfill(' ') << std::setw(5) << getSectionEntryChars(&entries[i]) << std::endl;
     }
@@ -151,7 +154,7 @@ void printOptionalHeader(PE32PlusOptionalHeader *header) {
     std::cout << "  [*] Number of Rva and Sizes: " << header->winHead.numOfRvaAndSizes<< std::endl;
 }
 
-void printDataDirectories(ImageDataDirectoryEntry *entries, uint32_t numOf) {
+void printDataDirectories(std::vector<ImageDataDirectoryEntry> entries, uint32_t numOf) {
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########            Optional Header Data Directories           ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;

@@ -22,12 +22,12 @@ class Parser {
     };
 
     std::ifstream *infile;
-    ParsingInfo *parsingInfo = new ParsingInfo();
-    COFFHeader *coffHeader = new COFFHeader();
-    PE32OptionalHeader *optionalHeader32bit = new PE32OptionalHeader();
-    PE32PlusOptionalHeader *optionalHeader64bit = new PE32PlusOptionalHeader();
-    ImageDataDirectoryEntry *dataDirectoryTable = nullptr;
-    SectionTableEntry *sectionTable = nullptr;
+    std::unique_ptr<ParsingInfo> parsingInfo = std::make_unique<ParsingInfo>(); 
+    std::unique_ptr<COFFHeader> coffHeader = std::make_unique<COFFHeader>();
+    std::unique_ptr<PE32OptionalHeader> optionalHeader32bit = std::make_unique<PE32OptionalHeader>();
+    std::unique_ptr<PE32PlusOptionalHeader> optionalHeader64bit = std::make_unique<PE32PlusOptionalHeader>();
+    std::vector<ImageDataDirectoryEntry> dataDirectoryTable;
+    std::vector<SectionTableEntry> sectionTable;
 
     // Seeks inside PE file currently pointed to by infile
     void seek(uint32_t offset) {
@@ -47,59 +47,40 @@ class Parser {
 
     void parseCOFF(uint32_t offset) {
         seek(offset);
-        infile->read((char *)coffHeader, sizeof(COFFHeader));
+        infile->read((char *)&(*coffHeader), sizeof(COFFHeader));
     }
 
     void parseOptionalHeader(uint32_t offset) {
         seek(offset);
         if (parsingInfo->is64bit) {
-            infile->read((char *)optionalHeader64bit,sizeof(PE32PlusOptionalHeader));
+            infile->read((char *)&*optionalHeader64bit,sizeof(PE32PlusOptionalHeader));
         } else {
-            infile->read((char *)optionalHeader32bit, sizeof(PE32OptionalHeader));
+            infile->read((char *)&*optionalHeader32bit, sizeof(PE32OptionalHeader));
         }
     }
 
     void parseDataDirectories(uint32_t size, int offset) {
         if (size != 0) {
-            dataDirectoryTable = new ImageDataDirectoryEntry[size];
             ImageDataDirectoryEntry idDir;
-            for (int i = 0; i < size; i++) {
+            for (unsigned int i = 0; i < size; i++) {
                 seek(offset + i * sizeof(ImageDataDirectoryEntry));
                 infile->read((char *)&idDir, sizeof(idDir));
-                dataDirectoryTable[i] = idDir;
+                dataDirectoryTable.push_back(idDir);
             }
         }
     }
 
     void parseSectionTable() {
-        sectionTable = new SectionTableEntry[parsingInfo->numOfSections];
         SectionTableEntry e;
         for (int i = 0; i < parsingInfo->numOfSections; i++) {
             seek(parsingInfo->SectiontableOffset + i * sizeof(SectionTableEntry));
             infile->read((char *)&e, sizeof(e));
-            sectionTable[i] = e;
+            sectionTable.push_back(e);
         }
     }
 
     void parseImportTable() {
-        // Used for offset calculations, pIDT points to the beginning of the
-        // import section in the file, and the virtual address can be used
-        // to calculate the offset to other parts of the table as it is the
-        // virtual address of the beginning of the file
-        uint32_t pIDT;
-        uint32_t importVA;
-        
-        SectionTableEntry e;
-        for (int i = 0; i < parsingInfo->numOfSections; i++) {
-            e = sectionTable[i];
-            if (namecmp(e.name, ".idata")) {
-                pIDT = e.pToRawData;
-                importVA = e.virtualAddress;
-                break;
-            }
-        }
-
-        
+          
     }
 
 public:
@@ -148,7 +129,11 @@ public:
 
         printDataDirectories(dataDirectoryTable, parsingInfo->numOfRVAandSizes);
 
-
+        
+        // Parse Section Headers
+        parsingInfo->SectiontableOffset = parsingInfo->COFFOffset + coffHeader->sizeOfOptionalHeader; 
+        parseSectionTable();
+        printSectionTableInfo(sectionTable, coffHeader->numOfSections);
         return 1;
     }
 
