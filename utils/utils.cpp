@@ -55,13 +55,13 @@ bool namecmp(uint8_t *name, const char *sectionName) {
     return true;
 }
 
-std::string readAscii(std::ifstream &infile, int offset) {
+std::string readAscii(std::ifstream *infile, int offset) {
     char c = 1;
     std::string ret;
     int i = 0;
     while (c != 0) {
-        infile.seekg(offset + i, std::ios::beg);
-        infile.read(&c, 1);
+        infile->seekg(offset + i, std::ios::beg);
+        infile->read(&c, 1);
         ret += c;
         i++;
     }

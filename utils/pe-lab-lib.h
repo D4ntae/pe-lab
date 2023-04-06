@@ -143,6 +143,11 @@ struct DllNameFunctionNumber {
     bool operator <(const DllNameFunctionNumber &other)const {
         return name < other.name;
     }
+    DllNameFunctionNumber(int numOfFunctions, std::string name) {
+        this->name = name;
+        this->numOfFunctions = numOfFunctions;
+    }
+    DllNameFunctionNumber() {}
 };
 
 struct HintTableEntry {

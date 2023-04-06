@@ -170,12 +170,12 @@ void printDataDirectories(std::vector<ImageDataDirectoryEntry> entries, uint32_t
     }
 }
 
-void printImports(std::map<DllNameFunctionNumber, std::vector<HintTableEntry>> *imports) {
+void printImports(std::map<DllNameFunctionNumber, std::vector<HintTableEntry>> imports) {
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                        Imports                        ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
 
-    for (std::map<DllNameFunctionNumber, std::vector<HintTableEntry>>::iterator it = imports->begin(); it != imports->end(); it++) {
+    for (std::map<DllNameFunctionNumber, std::vector<HintTableEntry>>::iterator it = imports.begin(); it != imports.end(); it++) {
         std::cout << "  [*] DLL Name: " << it->first.name << " " << "(" << it->first.numOfFunctions << " functions)" << std::endl;
         for (std::vector<HintTableEntry>::iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
             std::cout << "   - Name: " << it2->name;

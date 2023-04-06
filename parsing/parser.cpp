@@ -29,6 +29,7 @@ class Parser {
     std::vector<ImageDataDirectoryEntry> dataDirectoryTable;
     std::vector<SectionTableEntry> sectionTable;
     std::vector<ImportDirectoryTableEntry> IDT;
+    std::map<DllNameFunctionNumber, std::vector<HintTableEntry>> imports;
 
     // Seeks inside PE file currently pointed to by infile
     void seek(uint32_t offset) {
@@ -91,16 +92,60 @@ class Parser {
         return importSection;
     }
 
+
+    std::vector<HintTableEntry> getHintTableEntries(int ILT_offset, SectionTableEntry importSection, ImportDirectoryTableEntry idt_entry, int *functionNum) {
+        int i = 1;
+        std::vector<HintTableEntry> hintTable;
+        if (parsingInfo->is64bit) {
+
+        } else {
+            ILTEntryPE32 entry;
+            seek(ILT_offset);
+            infile->read((char *)&entry, sizeof(ILTEntryPE32));
+            while (entry.bitField != 0) {
+                if (entry.bitField & 0x80000000) {
+                    std::cout << "Ordinal: " << (entry.bitField & 0x80000000);
+                } else {
+                    uint16_t hint;
+                    seek(importSection.pToRawData + (entry.bitField - importSection.virtualAddress));
+                    infile->read((char *)&hint, sizeof(hint));
+                    std::string importName = readAscii(infile, importSection.pToRawData + (entry.bitField + 2 - importSection.virtualAddress)); 
+                    HintTableEntry h_entry(hint, importName, true);
+                    hintTable.push_back(h_entry);
+                }
+                seek(ILT_offset + i * sizeof(ILTEntryPE32));
+                infile->read((char*)&entry, sizeof(entry));
+                i++;
+            }
+        }
+        *functionNum = i - 1;
+        return hintTable;
+    }
+
     void parseImportTable(ImageDataDirectoryEntry importDir, std::vector<SectionTableEntry> sections) {
         SectionTableEntry importSection = locateImportTable(importDir, sections); 
         ImportDirectoryTableEntry e;
-        seek(importSection.pToRawData);
+        int import_offset = importSection.pToRawData + (importDir.VA - importSection.virtualAddress);
+        
+        seek(import_offset);
         infile->read((char *)&e, sizeof(e));
-        while (e.ILT_RVA != 0) {
+        int i = 1;
+        while (e.nameRVA != 0) {
             IDT.push_back(e);
-            infile->seekg(sizeof(e), std::ios::cur);
+            seek(import_offset + i * sizeof(ImportDirectoryTableEntry));
             infile->read((char *)&e, sizeof(e));
+            i++;
         }
+
+        for (ImportDirectoryTableEntry idt_entry : IDT) {
+            int functionNum = 0;
+            int ILT_offset = importSection.pToRawData + (idt_entry.ILT_RVA - importSection.virtualAddress); 
+            std::string dllName = readAscii(infile, importSection.pToRawData + (idt_entry.nameRVA - importSection.virtualAddress));
+            std::vector<HintTableEntry> hintTable = getHintTableEntries(ILT_offset, importSection, idt_entry, &functionNum);
+            DllNameFunctionNumber temp(functionNum, dllName);
+            imports.insert({temp, hintTable});
+        }
+
     }
 
 public:
@@ -156,6 +201,7 @@ public:
         printSectionTableInfo(sectionTable, coffHeader->numOfSections);
 
         parseImportTable(dataDirectoryTable[1], sectionTable);
+        printImports(imports);
         return 1;
     }
 
