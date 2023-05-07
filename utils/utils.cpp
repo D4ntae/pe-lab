@@ -1,4 +1,9 @@
-#include <iostream>
+// *************************************************
+// * Various utility functions related mostly to   *
+// * making the output look better and for getting *
+// * strings out of memory                         *
+// *************************************************
+
 #include <fstream>
 
 char* getTime(uint32_t timestamp) {

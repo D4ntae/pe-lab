@@ -1,7 +1,11 @@
+#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <fstream>
 #include <cstdint>
 #include <map>
+#include <ostream>
+#include <string>
 #include <vector>
 #include <memory>
 
@@ -9,7 +13,8 @@
 #include "../utils/utils.h"
 #include "../utils/logging.h"
 
-class Parser {    
+class Parser {
+    // Used for storing offsets to varius important parts of file which makes parsing easier
     struct ParsingInfo {
         uint32_t peOffset;
         uint32_t COFFOffset;
@@ -20,7 +25,8 @@ class Parser {
         uint32_t numOfRVAandSizes;
         uint16_t numOfSections;
     };
-
+   
+    // Structures needed for parsing the file, explained in the pe-lab-lib.h file
     std::ifstream *infile;
     std::unique_ptr<ParsingInfo> parsingInfo = std::make_unique<ParsingInfo>(); 
     std::unique_ptr<COFFHeader> coffHeader = std::make_unique<COFFHeader>();
@@ -97,20 +103,43 @@ class Parser {
         int i = 1;
         std::vector<HintTableEntry> hintTable;
         if (parsingInfo->is64bit) {
-
+            ILTEntryPE32Plus entry;
+            seek(ILT_offset);
+            infile->read((char *)&entry, sizeof(ILTEntryPE32Plus));
+            while (entry.bitField != 0) {
+                if (entry.bitField & 0x8000000000000000) {
+                    uint16_t hint = entry.bitField & 0x7FFFFFFFFFFFFFFF;
+                    std::string importName = "0"; 
+                    HintTableEntry h_entry(hint, importName, true);
+                    hintTable.push_back(h_entry);
+                } else {
+                    uint16_t hint;
+                    seek(importSection.pToRawData + (entry.bitField - importSection.virtualAddress));
+                    infile->read((char *)&hint, sizeof(hint));
+                    std::string importName = readAscii(infile, importSection.pToRawData + (entry.bitField + 2 - importSection.virtualAddress)); 
+                    HintTableEntry h_entry(hint, importName, false);
+                    hintTable.push_back(h_entry);
+                }
+                seek(ILT_offset + i * sizeof(ILTEntryPE32Plus));
+                infile->read((char*)&entry, sizeof(entry));
+                i++;
+            }
         } else {
             ILTEntryPE32 entry;
             seek(ILT_offset);
             infile->read((char *)&entry, sizeof(ILTEntryPE32));
             while (entry.bitField != 0) {
                 if (entry.bitField & 0x80000000) {
-                    std::cout << "Ordinal: " << (entry.bitField & 0x80000000);
+                    uint16_t hint = entry.bitField & 0x7FFFFFFF;
+                    std::string importName = "0"; 
+                    HintTableEntry h_entry(hint, importName, true);
+                    hintTable.push_back(h_entry);
                 } else {
                     uint16_t hint;
                     seek(importSection.pToRawData + (entry.bitField - importSection.virtualAddress));
                     infile->read((char *)&hint, sizeof(hint));
                     std::string importName = readAscii(infile, importSection.pToRawData + (entry.bitField + 2 - importSection.virtualAddress)); 
-                    HintTableEntry h_entry(hint, importName, true);
+                    HintTableEntry h_entry(hint, importName, false);
                     hintTable.push_back(h_entry);
                 }
                 seek(ILT_offset + i * sizeof(ILTEntryPE32));
@@ -126,7 +155,6 @@ class Parser {
         SectionTableEntry importSection = locateImportTable(importDir, sections); 
         ImportDirectoryTableEntry e;
         int import_offset = importSection.pToRawData + (importDir.VA - importSection.virtualAddress);
-        
         seek(import_offset);
         infile->read((char *)&e, sizeof(e));
         int i = 1;
@@ -139,9 +167,9 @@ class Parser {
 
         for (ImportDirectoryTableEntry idt_entry : IDT) {
             int functionNum = 0;
-            int ILT_offset = importSection.pToRawData + (idt_entry.ILT_RVA - importSection.virtualAddress); 
+            int IAT_offset = importSection.pToRawData + (idt_entry.IAT_RVA - importSection.virtualAddress); 
             std::string dllName = readAscii(infile, importSection.pToRawData + (idt_entry.nameRVA - importSection.virtualAddress));
-            std::vector<HintTableEntry> hintTable = getHintTableEntries(ILT_offset, importSection, idt_entry, &functionNum);
+            std::vector<HintTableEntry> hintTable = getHintTableEntries(IAT_offset, importSection, idt_entry, &functionNum);
             DllNameFunctionNumber temp(functionNum, dllName);
             imports.insert({temp, hintTable});
         }
@@ -161,10 +189,11 @@ public:
             return 0;
         }
 
+        std::cout << std::hex << std::setfill('0');
+
         // COFFHeader is right after PE signature
         parsingInfo->COFFOffset = parsingInfo->peOffset + 4;
         parseCOFF(parsingInfo->COFFOffset);
-        printCOFFHeaderInfo(&*this->coffHeader);
 
         // OptionalHeader is right after COFFHeader
         parsingInfo->OptionalHeaderOffset = parsingInfo->COFFOffset + sizeof(COFFHeader);
@@ -187,24 +216,32 @@ public:
             return 0;
         }
         parseOptionalHeader(parsingInfo->OptionalHeaderOffset);
-
         // Parse number of RVA and sizes needed for data directories
         seek(parsingInfo->numOfRVAandSizes);
         infile->read((char *)&(parsingInfo->numOfRVAandSizes), sizeof(parsingInfo->numOfRVAandSizes));
         parseDataDirectories(parsingInfo->numOfRVAandSizes, parsingInfo->DataDirectoryOffset);
 
-        printDataDirectories(dataDirectoryTable, parsingInfo->numOfRVAandSizes);
-
-        
         // Parse Section Headers
         parseSectionTable(coffHeader->numOfSections, parsingInfo->COFFOffset + sizeof(COFFHeader) + coffHeader->sizeOfOptionalHeader);
-        printSectionTableInfo(sectionTable, coffHeader->numOfSections);
 
         parseImportTable(dataDirectoryTable[1], sectionTable);
-        printImports(imports);
+        
         return 1;
     }
 
+    void printAllInfo() {
+
+        printCOFFHeaderInfo(&*this->coffHeader);
+        if (this->parsingInfo->is64bit) {
+            printOptionalHeader(&*this->optionalHeader64bit);
+        } else {
+            printOptionalHeader(&*this->optionalHeader32bit);
+        }
+        printDataDirectories(dataDirectoryTable, parsingInfo->numOfRVAandSizes);
+        printSectionTableInfo(sectionTable, coffHeader->numOfSections);
+        printImports(imports);
+    }
+    
     Parser(std::ifstream *infile) {
         this->infile = infile;
 
@@ -222,7 +259,7 @@ public:
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
         std::cerr << "No file name passed." << std::endl;
-        std::cout << "Usage: pe-lab <filename>";
+        std::cout << "Usage:  <filename>";
         return 1;
     }
     
@@ -233,6 +270,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    Parser *f = new Parser(&infile);
+    std::unique_ptr<Parser> parser = std::make_unique<Parser>(&infile);
+    parser->printAllInfo();
     return 0;
 }

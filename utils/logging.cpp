@@ -1,5 +1,14 @@
+// ****************************************************************
+// * Functions related to printing output to the screen and       *
+// * matching codes to strings such as machine name               *
+// ****************************************************************
+
 #include "pe-lab-lib.h"
 #include "utils.h"
+#include "string.h"
+#include <map>
+#include <cstdint>
+#include <iomanip>
 #include <vector>
 
 std::map<uint16_t, const char *> machineType = {
@@ -49,54 +58,63 @@ std::map<uint16_t, const char *> subsystem = {
     {16, "Windows Boot Application"}
 };
 
+void printWithPad(const char* startString, uint64_t toPrint, int maxSize) {
+    std::cout << startString << std::setfill('.') << std::setw(maxSize - strlen(startString) + 1) << " " << std::setfill('0') << "0x" << std::setw(8) << toPrint << "\n";  
+}
+
+void printWithPad(const char* startString, const char* toPrint, int maxSize) {
+    std::cout << startString << std::setfill('.') << std::setw(maxSize - strlen(startString) + 1) << " " << toPrint << "\n";  
+};
+
 void printCOFFHeaderInfo(COFFHeader *header) {
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                   COFF Header Info                    ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
-    std::cout << "  [*] Machine: " << machineType[header->machine] << std::endl;
-    std::cout << "  [*] Sections #: " << header->numOfSections << std::endl;
-    std::cout << "  [*] Time created: " << getTime(header->timeDateStamp);
-    printf("  [*] Symbol table addr: 0x%x\n", header->pToSymbolTable);
-    std::cout << "  [*] Symbols #: " << header->numOfSymbols << std::endl;
-    std::cout << "  [*] Size of optional header: " << header->sizeOfOptionalHeader << std::endl;
-    std::cout << "  [*] Characteristics: " << getChars(header->characteristics) << std::endl << std::endl;
+    printWithPad("  [*] Machine ", machineType[header->machine], 30);
+    printWithPad("  [*] Sections nums ", header->numOfSections, 30);
+    printWithPad("  [*] Time created ", getTime(header->timeDateStamp), 30);
+    printWithPad("  [*] Symbol table addr ", header->pToSymbolTable, 30);
+    printWithPad("  [*] Symbols nums ", header->numOfSymbols, 30);
+    printWithPad("  [*] Size of optional header ", header->sizeOfOptionalHeader, 30);
+    printWithPad("  [*] Characteristics ", getChars(header->characteristics).c_str(), 30);
 }
+
 
 void printOptionalHeader(PE32OptionalHeader *header) {
     // Standard Header
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                  Optional Header Info                 ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
-    printf("  [*] Magic: 0x%x (PE32)\n", header->standardHead.magic);
-    std::cout << "  [*] Major Linker Version: " << header->standardHead.majorLinkerVersion << std::endl;
-    std::cout << "  [*] Minor Linker Version: " << header->standardHead.minorLinkerVersion << std::endl;
-    std::cout << "  [*] Size of code: " << header->standardHead.sizeOfCode << std::endl;
-    std::cout << "  [*] Size of init. data: " << header->standardHead.sizeOfInitializedData << std::endl;
-    std::cout << "  [*] Size of uninit. data: " << header->standardHead.sizeOfUnitializedData << std::endl;
-    printf("  [*] Addr of entry: 0x%x\n", header->standardHead.addressOfEntryPoint);
-    printf("  [*] Base of code: 0x%x\n", header->standardHead.baseOfCode);
-    printf("  [*] Base of data: 0x%x\n", header->standardHead.baseOfData); // Unqiue to PE32
+    printWithPad("  [*] Magic ", header->standardHead.magic, 29);
+    printWithPad("  [*] Major Linker Version ", header->standardHead.majorLinkerVersion, 29);
+    printWithPad("  [*] Minor Linker Version ", header->standardHead.minorLinkerVersion, 29);
+    printWithPad("  [*] Size of code ", header->standardHead.sizeOfCode, 29);
+    printWithPad("  [*] Size of init. data ", header->standardHead.sizeOfInitializedData, 29);
+    printWithPad("  [*] Size of uninit. data ", header->standardHead.sizeOfUnitializedData, 29);
+    printWithPad("  [*] Addr of entry ", header->standardHead.addressOfEntryPoint, 29);
+    printWithPad("  [*] Base of code ", header->standardHead.baseOfCode, 29);
+    printWithPad("  [*] Base of data ", header->standardHead.baseOfData, 29);
 
     // Windows Header
-    printf("  [*] Image Base: 0x%x (PE32)\n", header->winHead.imageBase);
-    std::cout << "  [*] Section Alignment: " << header->winHead.sectionAlignment << std::endl;
-    std::cout << "  [*] File Alignment: " << header->winHead.fileAlignment << std::endl;
-    std::cout << "  [*] Major OS Version: " << header->winHead.majorOSVersion << std::endl;
-    std::cout << "  [*] Minor OS Version: " << header->winHead.minorOSVersion << std::endl;
-    std::cout << "  [*] Major Subsys. Version: " << header->winHead.majorSubsysVersion << std::endl;
-    std::cout << "  [*] Minor Subsys. Version: " << header->winHead.minotSubsysVersion << std::endl;
-    std::cout << "  [*] Win32 Version Value: " << header->winHead.win32VersionValue << std::endl;
-    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << std::endl;
-    std::cout << "  [*] Checksum: " << header->winHead.checkSum << std::endl;
-    std::cout << "  [*] Subsystem: " << subsystem[header->winHead.subsystem] << std::endl;
-    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << std::endl;
-    std::cout << "  [*] Dll Characteristics: " << getDLLChars(header->winHead.dllCharacteristics) << std::endl;
-    std::cout << "  [*] Size of Stack Reserve: " << header->winHead.sizeOfStackReserve << std::endl;
-    std::cout << "  [*] Size of Stack Commit: " << header->winHead.sizeOfStackCommit << std::endl;
-    std::cout << "  [*] Size of Heap Reserve: " << header->winHead.sizeOfHeapReserve << std::endl;
-    std::cout << "  [*] Size of Heap Commit: " << header->winHead.sizeOfHeapCommit << std::endl;
-    std::cout << "  [*] Loader Flags: " << header->winHead.loaderFlags << std::endl;
-    std::cout << "  [*] Number of Rva and Sizes: " << header->winHead.numOfRvaAndSizes<< std::endl;
+    printWithPad("  [*] Image Base: ", header->winHead.imageBase, 29);
+    printWithPad("  [*] Section Alignment ", header->winHead.sectionAlignment, 29);
+    printWithPad("  [*] File Alignment ", header->winHead.fileAlignment, 29);
+    printWithPad("  [*] Major OS Version ", header->winHead.majorOSVersion, 29);
+    printWithPad("  [*] Minor OS Version ", header->winHead.minorOSVersion, 29);
+    printWithPad("  [*] Major Subsys. Version ", header->winHead.majorSubsysVersion, 29);
+    printWithPad("  [*] Minor Subsys. Version ", header->winHead.minotSubsysVersion, 29);
+    printWithPad("  [*] Win32 Version Value ", header->winHead.win32VersionValue, 29);
+    printWithPad("  [*] Size of Headers ", header->winHead.sizeOfHeaders, 29);
+    printWithPad("  [*] Checksum ", header->winHead.checkSum, 29);
+    printWithPad("  [*] Subsys ", header->winHead.subsystem, 29);
+    printWithPad("  [*] Size of Image ", header->winHead.sizeOfImage, 29);
+    printWithPad("  [*] Dll Characteristics ", header->winHead.dllCharacteristics, 29);
+    printWithPad("  [*] Size of Stack Reserve ", header->winHead.sizeOfStackReserve, 29);
+    printWithPad("  [*] Size of Stack Commit ", header->winHead.sizeOfStackCommit, 29);
+    printWithPad("  [*] Size of Heap Reserve ", header->winHead.sizeOfHeapReserve, 29);
+    printWithPad("  [*] Size of Heap Commit ", header->winHead.sizeOfHeapCommit, 29);
+    printWithPad("  [*] Loader Flags ", header->winHead.loaderFlags, 29);
+    printWithPad("  [*] Numer of Rva and Sizes ", header->winHead.numOfRvaAndSizes, 28);
 }
 
 std::string getSectionEntryChars(SectionTableEntry *entry) {
@@ -111,16 +129,19 @@ void printSectionTableInfo(std::vector<SectionTableEntry> entries, uint32_t len)
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                   Section Table Info                  ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
+    std::cout << "\n";
     for (uint32_t i = 0; i < len; i++) {
-        std::cout << "  [*] Name: " << std::setw(6) << entries[i].name << std::setfill(' ') << std::setw(5) << getSectionEntryChars(&entries[i]) << std::endl;
-        std::cout << "  \t [+] Virtual size: " << entries[i].virtualSize << "\n";
-        std::cout << "  \t [+] Virtual address: " << entries[i].virtualAddress << "\n";
-        std::cout << "  \t [+] Size of raw data: " << entries[i].sizeOfRawData << "\n";
-        std::cout << "  \t [+] Pointer to raw data: " << entries[i].pToRawData << "\n";
-        std::cout << "  \t [+] Pointer to relocations: " << entries[i].pToRelocations << "\n";
-        std::cout << "  \t [+] Pointer to line numbers: " << entries[i].pToLinenumbers << "\n";
-        std::cout << "  \t [+] Number of relocations: " << entries[i].numOfRelocations << "\n";
-        std::cout << "  \t [+] Number of line numbers: " << entries[i].numOfLinenumbers << "\n";
+        std::cout << "  [*] Name: " << std::setw(6) << std::setfill(' ') << entries[i].name << std::setfill(' ') << std::setw(5) << getSectionEntryChars(&entries[i]) << std::endl;
+        std::cout << "  ------------------------\n";
+        printWithPad("    [+] Virtual size ", entries[i].virtualSize, 32);
+        printWithPad("    [+] Virtual address ", entries[i].virtualAddress, 32);
+        printWithPad("    [+] Size of raw data ", entries[i].sizeOfRawData, 32);
+        printWithPad("    [+] Poitner to raw data ", entries[i].pToRawData, 32);
+        printWithPad("    [+] Poitner to relocations ", entries[i].pToRelocations, 32);
+        printWithPad("    [+] Poitner to line numbers ", entries[i].pToLinenumbers, 32);
+        printWithPad("    [+] Number of relocations ", entries[i].numOfRelocations, 32);
+        printWithPad("    [+] Number of line numbers ", entries[i].numOfLinenumbers, 32);
+        std::cout << "\n";
     }
 }
 
@@ -130,34 +151,34 @@ void printOptionalHeader(PE32PlusOptionalHeader *header) {
     std::cout << " |##########                  Optional Header Info                 ##########|" << std::endl;
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     printf("  [*] Magic: 0x%x (PE32+)\n", header->standardHead.magic);
-    std::cout << "  [*] Major Linker Version: " << header->standardHead.majorLinkerVersion << std::endl;
-    std::cout << "  [*] Minor Linker Version: " << header->standardHead.minorLinkerVersion << std::endl;
-    std::cout << "  [*] Size of code: " << header->standardHead.sizeOfCode << std::endl;
-    std::cout << "  [*] Size of init. data: " << header->standardHead.sizeOfInitializedData << std::endl;
-    std::cout << "  [*] Size of uninit. data: " << header->standardHead.sizeOfUnitializedData << std::endl;
+    std::cout << "  [*] Major Linker Version: " << std::setw(8) << header->standardHead.majorLinkerVersion << std::endl;
+    std::cout << "  [*] Minor Linker Version: " << "0x" << std::setw(8) << header->standardHead.minorLinkerVersion << std::endl;
+    std::cout << "  [*] Size of code: " << "0x" << std::setw(8) << header->standardHead.sizeOfCode << std::endl;
+    std::cout << "  [*] Size of init. data: " << "0x" << std::setw(8) << header->standardHead.sizeOfInitializedData << std::endl;
+    std::cout << "  [*] Size of uninit. data: " << "0x" << std::setw(8) << header->standardHead.sizeOfUnitializedData << std::endl;
     printf("  [*] Addr of entry: 0x%x\n", header->standardHead.addressOfEntryPoint);
     printf("  [*] Base of code: 0x%x\n", header->standardHead.baseOfCode);
 
     // Windows Header
     printf("  [*] Image Base: 0x%lx (PE32+)\n", header->winHead.imageBase);
-    std::cout << "  [*] Section Alignment: " << header->winHead.sectionAlignment << std::endl;
-    std::cout << "  [*] File Alignment: " << header->winHead.fileAlignment << std::endl;
-    std::cout << "  [*] Major OS Version: " << header->winHead.majorOSVersion << std::endl;
-    std::cout << "  [*] Minor OS Version: " << header->winHead.minorOSVersion << std::endl;
-    std::cout << "  [*] Major Subsys. Version: " << header->winHead.majorSubsysVersion << std::endl;
-    std::cout << "  [*] Minor Subsys. Version: " << header->winHead.minotSubsysVersion << std::endl;
-    std::cout << "  [*] Win32 Version Value: " << header->winHead.win32VersionValue << std::endl;
-    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << std::endl;
-    std::cout << "  [*] Checksum: " << header->winHead.checkSum << std::endl;
-    std::cout << "  [*] Subsystem: " << subsystem[header->winHead.subsystem] << std::endl;
-    std::cout << "  [*] Size of Headers: " << header->winHead.sizeOfHeaders << std::endl;
+    std::cout << "  [*] Section Alignment: " << "0x" << std::setw(8) << header->winHead.sectionAlignment << std::endl;
+    std::cout << "  [*] File Alignment: " << "0x" << std::setw(8) << header->winHead.fileAlignment << std::endl;
+    std::cout << "  [*] Major OS Version: " << "0x" << std::setw(8) << header->winHead.majorOSVersion << std::endl;
+    std::cout << "  [*] Minor OS Version: " << "0x" << std::setw(8) << header->winHead.minorOSVersion << std::endl;
+    std::cout << "  [*] Major Subsys. Version: " << "0x" << std::setw(8) << header->winHead.majorSubsysVersion << std::endl;
+    std::cout << "  [*] Minor Subsys. Version: " << "0x" << std::setw(8) << header->winHead.minotSubsysVersion << std::endl;
+    std::cout << "  [*] Win32 Version Value: " << "0x" << std::setw(8) << header->winHead.win32VersionValue << std::endl;
+    std::cout << "  [*] Size of Headers: " << "0x" << std::setw(8) << header->winHead.sizeOfHeaders << std::endl;
+    std::cout << "  [*] Checksum: " << "0x" << std::setw(8) << header->winHead.checkSum << std::endl;
+    std::cout << "  [*] Subsystem: " << "0x" << std::setw(8) << subsystem[header->winHead.subsystem] << std::endl;
+    std::cout << "  [*] Size of Headers: " << "0x" << std::setw(8) << header->winHead.sizeOfHeaders << std::endl;
     std::cout << "  [*] Dll Characteristics: " << getDLLChars(header->winHead.dllCharacteristics) << std::endl;
-    std::cout << "  [*] Size of Stack Reserve: " << header->winHead.sizeOfStackReserve << std::endl;
-    std::cout << "  [*] Size of Stack Commit: " << header->winHead.sizeOfStackCommit << std::endl;
-    std::cout << "  [*] Size of Heap Reserve: " << header->winHead.sizeOfHeapReserve << std::endl;
-    std::cout << "  [*] Size of Heap Commit: " << header->winHead.sizeOfHeapCommit << std::endl;
-    std::cout << "  [*] Loader Flags: " << header->winHead.loaderFlags << std::endl;
-    std::cout << "  [*] Number of Rva and Sizes: " << header->winHead.numOfRvaAndSizes<< std::endl;
+    std::cout << "  [*] Size of Stack Reserve: " << "0x" << std::setw(8) << header->winHead.sizeOfStackReserve << std::endl;
+    std::cout << "  [*] Size of Stack Commit: " << "0x" << std::setw(8) << header->winHead.sizeOfStackCommit << std::endl;
+    std::cout << "  [*] Size of Heap Reserve: " << "0x" << std::setw(8) << header->winHead.sizeOfHeapReserve << std::endl;
+    std::cout << "  [*] Size of Heap Commit: " << "0x" << std::setw(8) << header->winHead.sizeOfHeapCommit << std::endl;
+    std::cout << "  [*] Loader Flags: " << "0x" << std::setw(8) << header->winHead.loaderFlags << std::endl;
+    std::cout << "  [*] Number of Rva and Sizes: " << "0x" << std::setw(8) << header->winHead.numOfRvaAndSizes<< std::endl;
 }
 
 void printDataDirectories(std::vector<ImageDataDirectoryEntry> entries, uint32_t numOf) {
@@ -166,20 +187,37 @@ void printDataDirectories(std::vector<ImageDataDirectoryEntry> entries, uint32_t
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::string table[] = {"Export Table", "Import Table", "Resource Table", "Exception Table", "Certificate Table", "Base Relocation Table", "Debug", "Architecture", "Global Ptr", "TLS Table", "Load Config Table", "Bound Import", "IAT", "Delay Import Descriptor", "CLR Runtime Header"};
     for (uint32_t i = 0; i < numOf - 1; i++) {
-        std::cout << "  [*] " << table[i] << ": {RVA: " << entries[i].VA << ", Size: " << entries[i].size << "}\n";
+        std::cout << "  [*] " << table[i] << "\n";
+        printWithPad("    RVA", entries[i].VA, 8);
+        printWithPad("    Size", entries[i].size, 8);
+        std::cout << "\n";
     }
 }
 
 void printImports(std::map<DllNameFunctionNumber, std::vector<HintTableEntry>> imports) {
     std::cout << " +---------------------------------------------------------------------------+" << std::endl;
     std::cout << " |##########                        Imports                        ##########|" << std::endl;
-    std::cout << " +---------------------------------------------------------------------------+" << std::endl;
-
+    std::cout << " +---------------------------------------------------------------------------+\n" << std::endl;
     for (std::map<DllNameFunctionNumber, std::vector<HintTableEntry>>::iterator it = imports.begin(); it != imports.end(); it++) {
-        std::cout << "  [*] DLL Name: " << it->first.name << " " << "(" << it->first.numOfFunctions << " functions)" << std::endl;
-        for (std::vector<HintTableEntry>::iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
-            std::cout << "   - Name: " << it2->name;
-            printf(" (Hint: %x)\n", it2->hint);
+        std::cout << "  [*] " <<  it->first.name << "\t" << std::dec << it->first.numOfFunctions << " function(s)" << "\n";
+        if (!it->second[0].isOrdinalImport) {
+            std::cout << "  +-----------------------------------------+\n";
+            std::cout << "  |\tHINT    NAME                        |\n";
+            std::cout << "  +-----------------------------------------+\n";
+        } else {
+            std::cout << "  +-----------------------------------------+\n";
+            std::cout << "  |\tORDINAL                             |\n";
+            std::cout << "  +-----------------------------------------+\n";
+
         }
+        for (std::vector<HintTableEntry>::iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+            if (it2->isOrdinalImport) {
+                std::cout << "  \t" << it2->hint << std::endl;
+            } else {
+                std::cout << "\t" << "0x" << std::hex << std::setfill('0') << std::setw(4) << it2->hint;
+                std::cout << "\t" << it2->name << "\n";
+            }
+        }
+        std::cout << "\n";
     }
 }
